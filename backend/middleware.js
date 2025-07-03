@@ -1,5 +1,6 @@
-const jwt = require('jsonwebtoken');
-const JWT_SECRET = require('./config')
+import jwt from 'jsonwebtoken'
+import JWT_SECRET from './config.js'
+
 const authMiddleware = (req, res, next)=>{
     const authHeader = req.headers.authorization;
     if(!authHeader || !authHeader.startsWith('Bearer ')){
@@ -8,14 +9,11 @@ const authMiddleware = (req, res, next)=>{
     }
 
     const token = authHeader.split(' ')[1];
-    console.log(token)
     try{
         const decoded = jwt.verify(token, JWT_SECRET);
         
-        if(decoded.userId){
-            req.body.userId = decoded.userId;
-            console.log("Decoded User Id : " + decoded.userId)
-            console.log("Attached to body " + req.body.userId)
+        if(decoded.UserId){
+            req.body.UserId = decoded.UserId;
             next();
         }
         else{
@@ -28,6 +26,4 @@ const authMiddleware = (req, res, next)=>{
     }
 } 
 
-module.exports = {
-    authMiddleware
-}
+export { authMiddleware }

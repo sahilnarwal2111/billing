@@ -1,2 +1,2 @@
-const JWT_SECRET = "sahilsecret";
-module.exports = JWT_SECRET
+const JWT_SECRET = process.env.JWT_SECRET;
+export default JWT_SECRET

@@ -1,11 +1,11 @@
-const express = require('express')
-const userRouter = require('./user')
-const accountRouter = require('./account')
+import express from 'express'
+import userRouter from './user.js'
+import billRouter from './bill.js'
 
 const router = express.Router();
 
 router.use('/user', userRouter)
-router.use('/account', accountRouter)
+router.use('/bill', billRouter)
 
-module.exports = router
+export default router
 

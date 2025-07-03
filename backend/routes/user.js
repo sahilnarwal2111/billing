@@ -1,149 +1,88 @@
-const express = require('express')
-const zod = require('zod')
-const { user, account } = require('../db')
-const jwt = require('jsonwebtoken')
-const JWT_SECRET = require('../config')
-const { authMiddleware } = require('../middleware')
-
+import express from 'express'
+import zod from 'zod'
+import { User } from '../db.js'
+import jwt from 'jsonwebtoken'
+import bcrypt from 'bcrypt'
+import JWT_SECRET from '../config.js'
+import signupSchema from './schema/signupSchema.js'
+import loginSchema from './schema/loginSchema.js'
+import { authMiddleware } from '../middleware.js'
 const router = express.Router();
-// router.use(express.json());
-
-const signupSchema = zod.object({
-    username : zod.string(),
-    firstName : zod.string(),
-    lastName : zod.string(),
-    password : zod.string()
-})
 
 router.post('/signup',async (req, res)=>{
     const body = req.body;
     const {success} =  signupSchema.safeParse(body);
     if(!success){
-        return res.status(411).json({msg : "Email already exists / Input invalids"})
+        return res.status(411).json({msg : "Input invalids"})
     }
 
-    const existingUser = await user.findOne({
-        username : body.username
+    const existingUser = await User.findOne({
+        email : body.email
     })
 
     if(existingUser){
-        return res.status(411).json({msg : "Email already exists / Input invalids"})
+        return res.status(411).json({msg : "Email already exists"})
     }
 
-    const newUser = await user.create({
-        username : body.username,
-        password : body.password,
+    const hashedPassword = await bcrypt.hash(body.password, 10);
+
+    const newUser = await User.create({
+        email : body.email,
+        password : hashedPassword,
         firstName : body.firstName,
         lastName  : body.lastName
     })
 
-    const userId = newUser._id;
-    
-    await account.create({
-        userId : userId, 
-        balance : Math.ceil(Math.random() * 1000 + 1)
-    })    
+    const UserId = newUser._id;
 
     const token = jwt.sign({
-        userId
+        UserId
     }, JWT_SECRET);
 
-    res.json({
+    res.status(201).json({
         message : "User created successfully",
         token : token
     })
 
 })
 
-const singinSchema = zod.object({
-    username : zod.string(),
-    password : zod.string()
-})
-
-router.post('/signin',async (req, res)=>{
+router.post('/login',async (req, res)=>{
     const body = req.body;
-    const { success } = singinSchema.safeParse(body);
-
+    const {success} = loginSchema.safeParse(body);
     if(!success){
-        res.status(411).json({msg : "User not found"})
+        return res.status(411).json({msg : "Input invalids"})
     }
 
-    const currentUser = await user.find({
-        username : body.username,
-        password : body.password
+    const user = await User.findOne({
+        email : body.email
     })
 
-    if(currentUser){
-        const id = currentUser._id;
-        const token = jwt.sign({userId : id}, JWT_SECRET)
-        res.json({
-            token: token
-        })
-        return;
+    if(!user){
+        return res.status(411).json({msg : "User not found"})
     }
 
-    res.status(404).json({msg : "Errow while logni"})
+    const isPasswordValid = await bcrypt.compare(body.password, user.password);
 
-
-})
-
-const updateBody = zod.object({
-    firstName : zod.string(),
-    lastName : zod.string(),
-    password : zod.string(),
-
-})
-
-router.put('/update',async (req, res)=>{
-    const body = req.body;
-    const { success } = updateBody.safeParse(body);
-    console.log(updateBody.safeParse(body))
-    if(!success){
-        res.status(404).json({msg : "Invalid inputs"})
-        return;
+    if(!isPasswordValid){
+        return res.status(411).json({msg : "Invalid password"})
     }
 
-    await user.updateOne(req.body, {
-        _id : req.id
-    })
+    const token = jwt.sign({
+        UserId : user._id
+    }, JWT_SECRET);
 
-    res.json({
-        msg : "Done successfully !"
-    })
-
-})
-
-router.get('/me', authMiddleware, (req, res)=>{
-    try{
-        const body = req.body;
-        res.status(200).json({user : body.userId})
-    }catch{
-        res.status(500).json({message: 'Server error' })
-    }
-})
-
-router.get('/bulk', async (req, res)=>{
-    const filter = req.query.filter || "";
-    
-    const users = await user.find({
-        $or: [{
-            firstName : {
-                "$regex" : filter
-            },
-            lastName :{
-                "$regex" : filter
-            }
-        }]
-    })
-    res.json({
-        user: users.map(user=>({
-            username : user.username,
-            firstName : user.firstName, 
-            lastName : user.lastName,
-            _id : user._id
-        }))
+    res.status(200).json({
+        message : "Login successful",
+        token : token
     })
 })
- 
 
-module.exports = router
+router.get('/profile',authMiddleware,async (req, res)=>{
+    const user = await User.findById(req.body.UserId);
+    res.status(200).json({
+        message : "Profile fetched successfully",
+        user : user
+    })
+})
+
+export default router
